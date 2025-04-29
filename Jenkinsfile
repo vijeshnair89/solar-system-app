@@ -9,7 +9,7 @@ pipeline {
         SCANNER_HOME   = tool 'sonar-scanner'
         MONGO_URI = credentials('mongo_url')
         MONGO_USERNAME  = credentials('mongo_user')
-        MONGO_PASSWORD   = credentials('mongo_pwd')
+        MONGO_PASSWORD   = credentials('mongo_pwd') 
     }
 
     stages {
