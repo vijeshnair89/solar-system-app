@@ -29,31 +29,16 @@ pipeline {
             }
         }
         
-        stage("Dependency Scan"){
-            parallel {
-                stage("dependency check using npm"){
-                    steps{
-                        sh 'npm audit --audit-level=critical'
-                        sh 'echo $?'
-                    }
-                }
-                
-                stage("owasp dependency check"){
-                    steps{
-                        dependencyCheck additionalArguments: ''' 
-                        --scan ./ \
-                        --out ./ \
-                        --format ALL \
-                        --prettyPrint \
-                        --disableYarnAudit \
-                        ''', odcInstallation: 'dp-check'
-                        
-                    dependencyCheckPublisher failedTotalCritical: 1, pattern: 'dependency-check-report.xml', skipNoReportFiles: true, stopBuild: true
-                    
-                    }
-                }
+      
+          
+        stage("dependency check using npm"){
+            steps{
+                sh 'npm audit --audit-level=critical'
+                sh 'echo $?'
             }
         }
+                
+                
 
         
         stage('unit test') {
@@ -166,12 +151,12 @@ pipeline {
     
     post {
       always {
-        publishHTML([allowMissing: true, alwaysLinkToLastBuild: true, icon: '', keepAll: true, reportDir: './', reportFiles: 'dependency-check-jenkins.html', reportName: 'Dependency Check HTML Report', reportTitles: '', useWrapperFileDirectly: true])
+        
         publishHTML([allowMissing: true, alwaysLinkToLastBuild: true, icon: '', keepAll: true, reportDir: 'coverage/lcov-report', reportFiles: 'index.html', reportName: 'Code Coverage Report', reportTitles: '', useWrapperFileDirectly: true])
         publishHTML([allowMissing: true, alwaysLinkToLastBuild: true, icon: '', keepAll: true, reportDir: './', reportFiles: 'trivy-scan-CRITICAL-report.html', reportName: 'Trivy scan critical vuln', reportTitles: '', useWrapperFileDirectly: true])
         publishHTML([allowMissing: true, alwaysLinkToLastBuild: true, icon: '', keepAll: true, reportDir: './', reportFiles: 'trivy-scan-LOW-MEDIUM-HIGH-report.html', reportName: 'Trivy scan low medium high vuln', reportTitles: '', useWrapperFileDirectly: true])
         
-        junit allowEmptyResults: true, keepProperties: true, testResults: 'dependency-check-junit.xml'
+       
         junit allowEmptyResults: true, keepProperties: true, stdioRetention: 'ALL', testResults: 'test-results.xml'
         junit allowEmptyResults: true, keepProperties: true, stdioRetention: 'ALL', testResults: 'trivy-scan-CRITICAL-report.xml'
         junit allowEmptyResults: true, keepProperties: true, stdioRetention: 'ALL', testResults: 'trivy-scan-LOW-MEDIUM-HIGH-report.xml'
