@@ -13,11 +13,6 @@ pipeline {
     }
 
     stages {
-        stage('clean workspace') {
-            steps {
-                cleanWs()
-            }
-        }
         
         stage('node version') {
             steps {
