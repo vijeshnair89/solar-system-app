@@ -28,18 +28,31 @@ pipeline {
                 sh 'npm install --no-audit'
             }
         }
-        
-      
+         
           
-        stage("dependency check using npm"){
-            steps{
-                sh 'npm audit --audit-level=critical'
-                sh 'echo $?'
+        stage("Dependency Checks"){
+            parallel {
+                stage("dependency check using npm"){
+                    steps{
+                        sh 'npm audit --audit-level=critical'
+                        sh 'echo $?'
+                    }
+                }
+                
+                stage("owasp dependency check"){
+                    steps{
+                        dependencyCheck additionalArguments: ''' 
+                        --scan ./ \
+                        --out ./ \
+                        --format ALL \
+                        --prettyPrint \
+                        --disableYarnAudit \
+                        ''', odcInstallation: 'dp-check'
+                    }
+                }
             }
         }
                 
-                
-
         
         stage('unit test') {
             steps {
@@ -122,7 +135,7 @@ pipeline {
         
         stage('Deploy to App Server') {
             when {
-                    branch 'feature/*'
+                    branch 'feature*'
             }
             steps {
                 script {
@@ -147,16 +160,101 @@ pipeline {
                 }
             }
         }
+
+        stage('Create PR to main') {
+            steps {
+                script {
+                    def branchName = sh(script: "git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
+                    def owner = "vijeshnair89" // Replace with actual owner
+                    def repo = "solar-system-app" // Replace with actual repo name
+        
+                    sh """
+                        curl -L \
+                          -X POST \
+                          -H "Accept: application/vnd.github+json" \
+                          -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                          -H "X-GitHub-Api-Version: 2022-11-28" \
+                          https://api.github.com/repos/${owner}/${repo}/pulls \
+                          -d '{
+                            "title": "Merge ${branchName} into main",
+                            "body": "Automated pull request created by Jenkins pipeline.",
+                            "head": "${branchName}",
+                            "base": "main"
+                          }'
+                    """
+                }
+            }
+        }
+
+        stage('Upload AWS-S3'){
+            steps{
+                withAWS(credentials: 'aws-ec2-access-creds', region: 'ap-south-1') {
+                    sh '''
+                       ls -lrt
+                       mkdir reports-${BUILD_NUMBER}
+                       cp trivy*.* reports-${BUILD_NUMBER}
+                       ls -ltr reports-${BUILD_NUMBER}
+                    '''
+                    s3Upload(
+                        file: "reports-${BUILD_NUMBER}",
+                        path: "jenkins-${JOB_NAME}-build-${BUILD_NUMBER}",
+                        bucket: 'solar-system-123-jenkins-bucket'
+                    )
+                }
+            }
+        }
+
+        stage("Update k8s image") {
+            steps {
+                script {
+                    def repoUrl = "https://github.com/vijeshnair89/kubernetes-manifests.git"
+                    def repoDir = "kubernetes-manifests"
+                    def subDir = "solar-system-app"
+        
+                    withCredentials([gitUsernamePassword(credentialsId: 'github-creds', gitToolName: 'Default')]) {
+                        if (!fileExists(repoDir)) {
+                            echo "Cloning repository..."
+                            sh "git clone -b main ${repoUrl} ${repoDir}"
+                        } else {
+                            echo "Repository exists. Pulling latest changes..."
+                            dir("${repoDir}") {
+                                sh '''
+                                    git reset --hard
+                                    git checkout main
+                                    git pull
+                                '''
+                            }
+                        }
+        
+                        // Update image tag and push
+                        dir("${repoDir}/${subDir}") {
+                            sh """
+                                sed -i 's@vijesh89.*@vijesh89/solar-system:${BUILD_ID}@g' deployment.yml
+                                echo "Updated deployment.yml:"
+                                cat deployment.yml
+        
+                                git config --global user.email "vijesh@example.com"
+                                git config --global user.name "Vijesh"
+                                git add .
+                                git commit -m "Updated deploy.yaml with image tag ${BUILD_ID}" || echo "No changes to commit"
+                                git push origin main
+                            """
+                        }
+                    }
+                }
+            }
+        }
     }
     
     post {
       always {
-        
+        publishHTML([allowMissing: true, alwaysLinkToLastBuild: true, icon: '', keepAll: true, reportDir: './', reportFiles: 'dependency-check-jenkins.html', reportName: 'Dependency Check HTML Report', reportTitles: '', useWrapperFileDirectly: true])
+        dependencyCheckPublisher failedTotalCritical: 1, pattern: 'dependency-check-report.xml', skipNoReportFiles: true, stopBuild: true
         publishHTML([allowMissing: true, alwaysLinkToLastBuild: true, icon: '', keepAll: true, reportDir: 'coverage/lcov-report', reportFiles: 'index.html', reportName: 'Code Coverage Report', reportTitles: '', useWrapperFileDirectly: true])
         publishHTML([allowMissing: true, alwaysLinkToLastBuild: true, icon: '', keepAll: true, reportDir: './', reportFiles: 'trivy-scan-CRITICAL-report.html', reportName: 'Trivy scan critical vuln', reportTitles: '', useWrapperFileDirectly: true])
         publishHTML([allowMissing: true, alwaysLinkToLastBuild: true, icon: '', keepAll: true, reportDir: './', reportFiles: 'trivy-scan-LOW-MEDIUM-HIGH-report.html', reportName: 'Trivy scan low medium high vuln', reportTitles: '', useWrapperFileDirectly: true])
         
-       
+        junit allowEmptyResults: true, keepProperties: true, stdioRetention: 'ALL', testResults: 'dependency-check-junit.xml'
         junit allowEmptyResults: true, keepProperties: true, stdioRetention: 'ALL', testResults: 'test-results.xml'
         junit allowEmptyResults: true, keepProperties: true, stdioRetention: 'ALL', testResults: 'trivy-scan-CRITICAL-report.xml'
         junit allowEmptyResults: true, keepProperties: true, stdioRetention: 'ALL', testResults: 'trivy-scan-LOW-MEDIUM-HIGH-report.xml'
