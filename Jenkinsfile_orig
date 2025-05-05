@@ -10,6 +10,8 @@ pipeline {
         MONGO_URI = credentials('mongo_url')
         MONGO_USERNAME  = credentials('mongo_user')
         MONGO_PASSWORD   = credentials('mongo_pwd') 
+        GITHUB_TOKEN = credentials('github-token')
+        APP_SERVER = '13.203.155.183'
     }
 
     stages {
@@ -21,6 +23,12 @@ pipeline {
                 npm -v
                 '''
             }
+        }
+        
+        stage('git clone'){
+           steps {
+               git branch: 'feature', url: 'https://github.com/vijeshnair89/solar-system-app.git'
+           }
         }
         
         stage('install dependency') {
@@ -134,14 +142,11 @@ pipeline {
         }
         
         stage('Deploy to App Server') {
-            when {
-                    branch 'feature*'
-            }
             steps {
                 script {
                     sshagent(['app-server-private-key']) {
-                        sh '''
-                            ssh -o StrictHostKeyChecking=no ubuntu@54.172.243.227 "
+                        sh """
+                            ssh -o StrictHostKeyChecking=no ubuntu@${APP_SERVER} "
                                 if sudo docker ps -a | grep -i "solar-system" ; then
                                     echo "Container found... Stopping and removing"
                                         sudo docker stop "solar-system" && sudo docker rm "solar-system"
@@ -155,7 +160,7 @@ pipeline {
                                     -e MONGO_PASSWORD=${MONGO_PASSWORD} \
                                     -p 3000:3000 vijesh89/solar-system:${BUILD_ID}
                             "
-                        '''
+                        """
                     }
                 }
             }
@@ -192,7 +197,8 @@ pipeline {
                     sh '''
                        ls -lrt
                        mkdir reports-${BUILD_NUMBER}
-                       cp trivy*.* reports-${BUILD_NUMBER}
+                       cp -rf coverage/ reports-${BUILD_NUMBER}
+                       cp test-results.xml dependency*.* trivy*.* reports-${BUILD_NUMBER}
                        ls -ltr reports-${BUILD_NUMBER}
                     '''
                     s3Upload(
