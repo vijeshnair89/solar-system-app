@@ -25,13 +25,10 @@ pipeline {
             }
         }
         
-        stage('git clone'){
-           steps {
-               git branch: 'feature', url: 'https://github.com/vijeshnair89/solar-system-app.git'
-           }
-        }
-        
         stage('install dependency') {
+            when {
+                branch "feature"
+            }
             steps {
                 sh 'npm install --no-audit'
             }
@@ -39,6 +36,9 @@ pipeline {
          
           
         stage("Dependency Checks"){
+            when {
+                branch "feature"
+            }
             parallel {
                 stage("dependency check using npm"){
                     steps{
@@ -63,12 +63,18 @@ pipeline {
                 
         
         stage('unit test') {
+            when {
+                branch "feature"
+            }
             steps {
                 sh 'npm test'
             }
         }
         
         stage('code coverage') {
+            when {
+                branch "feature"
+            }
             steps {
                 catchError(buildResult: 'SUCCESS', message: 'Oops! This coverage feature issue will be fixed in the next release!!', stageResult: 'UNSTABLE') {
                     sh 'npm run coverage'
@@ -77,6 +83,9 @@ pipeline {
         }
         
         stage('SAST-Quality Check') {
+            when {
+                branch "feature"
+            }
             steps {
                 timeout(time: 60, unit: 'SECONDS') {
                     withSonarQubeEnv('sonar-server') {
@@ -184,7 +193,7 @@ pipeline {
             }
             steps {
                 script {
-                    def branchName = sh(script: "git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
+                    def branchName = env.BRANCH_NAME
                     def owner = "vijeshnair89" // Replace with actual owner
                     def repo = "solar-system-app" // Replace with actual repo name
         
@@ -208,7 +217,7 @@ pipeline {
 
         stage('Upload AWS-S3'){
             when {
-                branch "main"
+                branch "feature"
             }
             steps{
                 withAWS(credentials: 'aws-ec2-access-creds', region: 'ap-south-1') {
