@@ -1,19 +1,17 @@
 pipeline {
-    agent any
+    agent any   
     
     tools {
         nodejs 'nodejs'
     }
     
     environment {
-        REPO_OWNER="vijeshnair89"
-        REPO_NAME="solar-system-app"
-        BASE_BRANCH="main"
-        PR_TITLE="Merge code"
-        PR_BODY="Merge changes from feature to main"
+        SCANNER_HOME   = tool 'sonar-scanner'
         MONGO_URI = credentials('mongo_url')
         MONGO_USERNAME  = credentials('mongo_user')
         MONGO_PASSWORD   = credentials('mongo_pwd') 
+        GITHUB_TOKEN = credentials('github-token')
+        APP_SERVER = '13.203.155.183'
     }
 
     stages {
@@ -27,22 +25,72 @@ pipeline {
             }
         }
         
+        stage('git clone'){
+           steps {
+               git branch: 'feature', url: 'https://github.com/vijeshnair89/solar-system-app.git'
+           }
+        }
+        
         stage('install dependency') {
             steps {
                 sh 'npm install --no-audit'
             }
         }
-        
-      
+         
           
-        stage("dependency check using npm"){
-            steps{
-                sh 'npm audit --audit-level=critical'
-                sh 'echo $?'
+        stage("Dependency Checks"){
+            parallel {
+                stage("dependency check using npm"){
+                    steps{
+                        sh 'npm audit --audit-level=critical'
+                        sh 'echo $?'
+                    }
+                }
+                
+                stage("owasp dependency check"){
+                    steps{
+                        dependencyCheck additionalArguments: ''' 
+                        --scan ./ \
+                        --out ./ \
+                        --format ALL \
+                        --prettyPrint \
+                        --disableYarnAudit \
+                        ''', odcInstallation: 'dp-check'
+                    }
+                }
             }
         }
                 
         
+        stage('unit test') {
+            steps {
+                sh 'npm test'
+            }
+        }
+        
+        stage('code coverage') {
+            steps {
+                catchError(buildResult: 'SUCCESS', message: 'Oops! This coverage feature issue will be fixed in the next release!!', stageResult: 'UNSTABLE') {
+                    sh 'npm run coverage'
+                }
+            }
+        }
+        
+        stage('SAST-Quality Check') {
+            steps {
+                timeout(time: 60, unit: 'SECONDS') {
+                    withSonarQubeEnv('sonar-server') {
+                        sh '''
+                            $SCANNER_HOME/bin/sonar-scanner \
+                              -Dsonar.projectKey=solar-system \
+                              -Dsonar.sources=app.js \
+                              -Dsonar.javascript.lcov.reportPaths=./coverage/lcov.info 
+                        '''
+                    }
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
         
         stage('Build the image') {
             steps {
@@ -93,6 +141,75 @@ pipeline {
             }
         }
         
+        stage('Deploy to App Server') {
+            steps {
+                script {
+                    sshagent(['app-server-private-key']) {
+                        sh """
+                            ssh -o StrictHostKeyChecking=no ubuntu@${APP_SERVER} "
+                                if sudo docker ps -a | grep -i "solar-system" ; then
+                                    echo "Container found... Stopping and removing"
+                                        sudo docker stop "solar-system" && sudo docker rm "solar-system"
+                                    echo "Container Stopped and removed"
+                                fi
+                                echo "Deploying a new container"
+                                sudo docker run -d \
+                                    --name solar-system \
+                                    -e MONGO_URI=${MONGO_URI} \
+                                    -e MONGO_USERNAME=${MONGO_USERNAME} \
+                                    -e MONGO_PASSWORD=${MONGO_PASSWORD} \
+                                    -p 3000:3000 vijesh89/solar-system:${BUILD_ID}
+                            "
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Create PR to main') {
+            steps {
+                script {
+                    def branchName = sh(script: "git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
+                    def owner = "vijeshnair89" // Replace with actual owner
+                    def repo = "solar-system-app" // Replace with actual repo name
+        
+                    sh """
+                        curl -L \
+                          -X POST \
+                          -H "Accept: application/vnd.github+json" \
+                          -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                          -H "X-GitHub-Api-Version: 2022-11-28" \
+                          https://api.github.com/repos/${owner}/${repo}/pulls \
+                          -d '{
+                            "title": "Merge ${branchName} into main",
+                            "body": "Automated pull request created by Jenkins pipeline.",
+                            "head": "${branchName}",
+                            "base": "main"
+                          }'
+                    """
+                }
+            }
+        }
+
+        stage('Upload AWS-S3'){
+            steps{
+                withAWS(credentials: 'aws-ec2-access-creds', region: 'ap-south-1') {
+                    sh '''
+                       ls -lrt
+                       mkdir reports-${BUILD_NUMBER}
+                       cp -rf coverage/ reports-${BUILD_NUMBER}
+                       cp test-results.xml dependency*.* trivy*.* reports-${BUILD_NUMBER}
+                       ls -ltr reports-${BUILD_NUMBER}
+                    '''
+                    s3Upload(
+                        file: "reports-${BUILD_NUMBER}",
+                        path: "jenkins-${JOB_NAME}-build-${BUILD_NUMBER}",
+                        bucket: 'solar-system-123-jenkins-bucket'
+                    )
+                }
+            }
+        }
+
         stage("Update k8s image") {
             steps {
                 script {
@@ -133,48 +250,17 @@ pipeline {
                 }
             }
         }
-        
-        stage('Create PR to main'){
-            when{
-                branch 'feature'
-            }
-            steps{
-                sh '''
-                    curl -s -X POST -H "Authorization: token ${GITHUB_TOKEN}" \
-                    -d "{\"title\":\"${PR_TITLE}\", \"head\":\"${BRANCH_NAME}\", \
-                    \"base\":\"${BASE_BRANCH}\", \"body\":\"${PR_BODY}\"}" \
-                    https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls
-                '''
-            }
-        }
-        
-        stage('Upload AWS-S3'){
-            steps{
-                withAWS(credentials: 'aws-ec2-access-creds', region: 'ap-south-1') {
-                    sh '''
-                       ls -lrt
-                       mkdir reports-${BUILD_NUMBER}
-                       cp trivy*.* reports-${BUILD_NUMBER}
-                       ls -ltr reports-${BUILD_NUMBER}
-                    '''
-                    s3Upload(
-                        file: "reports-${BUILD_NUMBER}",
-                        path: "jenkins-${JOB_NAME}-build-${BUILD_NUMBER}",
-                        bucket: 'solar-system-123-jenkins-bucket'
-                    )
-                }
-            }
-        }
     }
     
     post {
       always {
-        
-       
+        publishHTML([allowMissing: true, alwaysLinkToLastBuild: true, icon: '', keepAll: true, reportDir: './', reportFiles: 'dependency-check-jenkins.html', reportName: 'Dependency Check HTML Report', reportTitles: '', useWrapperFileDirectly: true])
+        dependencyCheckPublisher failedTotalCritical: 1, pattern: 'dependency-check-report.xml', skipNoReportFiles: true, stopBuild: true
+        publishHTML([allowMissing: true, alwaysLinkToLastBuild: true, icon: '', keepAll: true, reportDir: 'coverage/lcov-report', reportFiles: 'index.html', reportName: 'Code Coverage Report', reportTitles: '', useWrapperFileDirectly: true])
         publishHTML([allowMissing: true, alwaysLinkToLastBuild: true, icon: '', keepAll: true, reportDir: './', reportFiles: 'trivy-scan-CRITICAL-report.html', reportName: 'Trivy scan critical vuln', reportTitles: '', useWrapperFileDirectly: true])
         publishHTML([allowMissing: true, alwaysLinkToLastBuild: true, icon: '', keepAll: true, reportDir: './', reportFiles: 'trivy-scan-LOW-MEDIUM-HIGH-report.html', reportName: 'Trivy scan low medium high vuln', reportTitles: '', useWrapperFileDirectly: true])
         
-       
+        junit allowEmptyResults: true, keepProperties: true, stdioRetention: 'ALL', testResults: 'dependency-check-junit.xml'
         junit allowEmptyResults: true, keepProperties: true, stdioRetention: 'ALL', testResults: 'test-results.xml'
         junit allowEmptyResults: true, keepProperties: true, stdioRetention: 'ALL', testResults: 'trivy-scan-CRITICAL-report.xml'
         junit allowEmptyResults: true, keepProperties: true, stdioRetention: 'ALL', testResults: 'trivy-scan-LOW-MEDIUM-HIGH-report.xml'
