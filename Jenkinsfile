@@ -11,7 +11,7 @@ pipeline {
         MONGO_USERNAME  = credentials('mongo_user')
         MONGO_PASSWORD   = credentials('mongo_pwd') 
         GITHUB_TOKEN = credentials('github-token')
-        APP_SERVER = '13.203.155.183'
+        APP_SERVER = credentials('server-ip')
     }
 
     stages {
