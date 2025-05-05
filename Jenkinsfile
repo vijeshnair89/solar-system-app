@@ -193,7 +193,7 @@ pipeline {
             }
             steps {
                 script {
-                    def branchName = sh(script: "git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
+                    def branchName = env.BRANCH_NAME
                     def owner = "vijeshnair89" // Replace with actual owner
                     def repo = "solar-system-app" // Replace with actual repo name
         
