@@ -93,12 +93,18 @@ pipeline {
         }
         
         stage('Build the image') {
+            when {
+                branch "feature"
+            }
             steps {
                 sh "docker build -t vijesh89/solar-system:${BUILD_ID} ."
             }
         }
         
         stage('Scan the image') {
+            when {
+                branch "feature"
+            }
             steps {
                 sh '''
                     trivy image vijesh89/solar-system:${BUILD_ID} \
@@ -134,6 +140,9 @@ pipeline {
         }
         
         stage('Push the Image') {
+            when {
+                branch "feature"
+            }
             steps {
                 withDockerRegistry(credentialsId: 'docker-creds', url: 'https://index.docker.io/v1/') {
                     sh 'docker push vijesh89/solar-system:${BUILD_ID}'   
@@ -142,6 +151,9 @@ pipeline {
         }
         
         stage('Deploy to App Server') {
+            when {
+                branch "feature"
+            }
             steps {
                 script {
                     sshagent(['app-server-private-key']) {
@@ -167,6 +179,9 @@ pipeline {
         }
 
         stage('Create PR to main') {
+            when {
+                branch "feature"
+            }
             steps {
                 script {
                     def branchName = sh(script: "git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
@@ -192,6 +207,9 @@ pipeline {
         }
 
         stage('Upload AWS-S3'){
+            when {
+                branch "main"
+            }
             steps{
                 withAWS(credentials: 'aws-ec2-access-creds', region: 'ap-south-1') {
                     sh '''
@@ -211,6 +229,9 @@ pipeline {
         }
 
         stage("Update k8s image") {
+            when {
+                branch "main"
+            }
             steps {
                 script {
                     def repoUrl = "https://github.com/vijeshnair89/kubernetes-manifests.git"
