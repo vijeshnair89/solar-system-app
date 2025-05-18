@@ -209,7 +209,7 @@ pipeline {
                        ls -lrt
                        mkdir reports-${BUILD_NUMBER}
                        cp -rf coverage/ reports-${BUILD_NUMBER}
-                       cp test-results.xml dependency*.* trivy*.* reports-${BUILD_NUMBER}
+                       cp test-results.xml dependency*.*  reports-${BUILD_NUMBER}
                        ls -ltr reports-${BUILD_NUMBER}
                     '''
                     s3Upload(
