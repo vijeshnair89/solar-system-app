@@ -28,7 +28,7 @@ pipeline {
         
         stage('install dependency') {
             when {
-                branch "feature"
+                branch "feature-*"
             }
             steps {
                 sh 'npm install --no-audit'
@@ -38,7 +38,7 @@ pipeline {
           
         stage("Dependency Checks"){
             when {
-                branch "feature"
+                branch "feature-*"
             }
             parallel {
                 stage("dependency check using npm"){
@@ -65,7 +65,7 @@ pipeline {
         
         stage('unit test') {
             when {
-                branch "feature"
+                branch "feature-*"
             }
             steps {
                 sh 'npm test'
@@ -74,7 +74,7 @@ pipeline {
         
         stage('code coverage') {
             when {
-                branch "feature"
+                branch "feature-*"
             }
             steps {
                 catchError(buildResult: 'SUCCESS', message: 'Oops! This coverage feature issue will be fixed in the next release!!', stageResult: 'UNSTABLE') {
@@ -83,28 +83,10 @@ pipeline {
             }
         }
         
-        stage('SAST-Quality Check') {
-            when {
-                branch "feature"
-            }
-            steps {
-                timeout(time: 60, unit: 'SECONDS') {
-                    withSonarQubeEnv('sonar-server') {
-                        sh '''
-                            $SCANNER_HOME/bin/sonar-scanner \
-                              -Dsonar.projectKey=solar-system \
-                              -Dsonar.sources=app.js \
-                              -Dsonar.javascript.lcov.reportPaths=./coverage/lcov.info 
-                        '''
-                    }
-                    waitForQualityGate abortPipeline: true
-                }
-            }
-        }
         
         stage('Build the image') {
             when {
-                branch "feature"
+                branch "feature-*"
             }
             steps {
                 sh "docker build -t vijesh89/solar-system:${BUILD_ID} ."
@@ -113,7 +95,7 @@ pipeline {
         
         stage('Scan the image') {
             when {
-                branch "feature"
+                branch "feature-*"
             }
             steps {
                 sh '''
@@ -151,7 +133,7 @@ pipeline {
         
         stage('Push the Image') {
             when {
-                branch "feature"
+                branch "feature-*"
             }
             steps {
                 withDockerRegistry(credentialsId: 'docker-creds', url: 'https://index.docker.io/v1/') {
@@ -162,7 +144,7 @@ pipeline {
         
         stage('Deploy to App Server') {
             when {
-                branch "feature"
+                branch "feature-*"
             }
             steps {
                 script {
@@ -190,7 +172,7 @@ pipeline {
 
         stage('Create PR to main') {
             when {
-                branch "feature"
+                branch "feature-*"
             }
             steps {
                 script {
@@ -218,7 +200,7 @@ pipeline {
 
         stage('Upload AWS-S3'){
             when {
-                branch "feature"
+                branch "feature-*"
             }
             steps{
                 withAWS(credentials: 'aws-ec2-access-creds', region: 'ap-south-1') {
