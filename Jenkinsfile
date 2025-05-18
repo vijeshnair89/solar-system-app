@@ -20,6 +20,7 @@ pipeline {
         stage('node version') {
             steps {
                 sh '''
+                echo ${env.GIT_COMMIT}
                 node -v
                 npm -v
                 '''
