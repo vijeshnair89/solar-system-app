@@ -56,6 +56,7 @@ pipeline {
                         --format ALL \
                         --prettyPrint \
                         --disableYarnAudit \
+                        --nvdApiKey ${NVD_API_KEY}
                         ''', odcInstallation: 'dp-check'
                     }
                 }
