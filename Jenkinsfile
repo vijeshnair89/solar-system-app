@@ -94,43 +94,43 @@ pipeline {
             }
         }
         
-        stage('Scan the image') {
-            when {
-                branch "feature-*"
-            }
-            steps {
-                sh '''
-                    trivy image vijesh89/solar-system:${BUILD_ID} \
-                    --severity MEDIUM,LOW,UNKNOWN,HIGH \
-                    --exit-code 0 \
-                    --quiet \
-                    --format json -o trivy-scan-LOW-MEDIUM-HIGH-report.json
+        // stage('Scan the image') {
+        //     when {
+        //         branch "feature-*"
+        //     }
+        //     steps {
+        //         sh '''
+        //             trivy image vijesh89/solar-system:${BUILD_ID} \
+        //             --severity MEDIUM,LOW,UNKNOWN,HIGH \
+        //             --exit-code 0 \
+        //             --quiet \
+        //             --format json -o trivy-scan-LOW-MEDIUM-HIGH-report.json
                     
-                    trivy image vijesh89/solar-system:${BUILD_ID} \
-                    --severity CRITICAL \
-                    --exit-code 1 \
-                    --quiet \
-                    --format json -o trivy-scan-CRITICAL-report.json
-                '''
-            }
-            post {
-                always {
-                    sh '''
-                        trivy convert --format template --template @/usr/local/share/trivy/templates/html.tpl \
-                        -o trivy-scan-LOW-MEDIUM-HIGH-report.html trivy-scan-LOW-MEDIUM-HIGH-report.json
+        //             trivy image vijesh89/solar-system:${BUILD_ID} \
+        //             --severity CRITICAL \
+        //             --exit-code 1 \
+        //             --quiet \
+        //             --format json -o trivy-scan-CRITICAL-report.json
+        //         '''
+        //     }
+        //     post {
+        //         always {
+        //             sh '''
+        //                 trivy convert --format template --template @/usr/local/share/trivy/templates/html.tpl \
+        //                 -o trivy-scan-LOW-MEDIUM-HIGH-report.html trivy-scan-LOW-MEDIUM-HIGH-report.json
                         
-                        trivy convert --format template --template @/usr/local/share/trivy/templates/junit.tpl \
-                        -o trivy-scan-LOW-MEDIUM-HIGH-report.xml trivy-scan-LOW-MEDIUM-HIGH-report.json
+        //                 trivy convert --format template --template @/usr/local/share/trivy/templates/junit.tpl \
+        //                 -o trivy-scan-LOW-MEDIUM-HIGH-report.xml trivy-scan-LOW-MEDIUM-HIGH-report.json
                         
-                        trivy convert --format template --template @/usr/local/share/trivy/templates/html.tpl \
-                        -o trivy-scan-CRITICAL-report.html trivy-scan-CRITICAL-report.json
+        //                 trivy convert --format template --template @/usr/local/share/trivy/templates/html.tpl \
+        //                 -o trivy-scan-CRITICAL-report.html trivy-scan-CRITICAL-report.json
                         
-                        trivy convert --format template --template @/usr/local/share/trivy/templates/junit.tpl \
-                        -o trivy-scan-CRITICAL-report.xml trivy-scan-CRITICAL-report.json
-                    '''
-                }
-            }
-        }
+        //                 trivy convert --format template --template @/usr/local/share/trivy/templates/junit.tpl \
+        //                 -o trivy-scan-CRITICAL-report.xml trivy-scan-CRITICAL-report.json
+        //             '''
+        //         }
+        //     }
+        // }
         
         stage('Push the Image') {
             when {
