@@ -204,7 +204,7 @@ pipeline {
                 branch "feature-*"
             }
             steps{
-                withAWS(credentials: 'aws-ec2-access-creds', region: 'ap-south-1') {
+                withAWS(credentials: 'aws-ec2-access-creds', region: 'us-east-1') {
                     sh '''
                        ls -lrt
                        mkdir reports-${BUILD_NUMBER}
