@@ -1,13 +1,13 @@
 pipeline {
     agent any   
     
-    tools {   
+    tools {  
         nodejs 'nodejs'
     }
     
     environment {
         NVD_API_KEY = credentials('nvd-api-key-id') 
-        //SCANNER_HOME   = tool 'sonar-scanner'
+        SCANNER_HOME   = tool 'sonar-scanner'
         MONGO_URI = credentials('mongo_url')
         MONGO_USERNAME  = credentials('mongo_user')
         MONGO_PASSWORD   = credentials('mongo_pwd') 
@@ -56,7 +56,7 @@ pipeline {
                         --format ALL \
                         --prettyPrint \
                         --disableYarnAudit \
-                        --nvdApiKey ${NVD_API_KEY} \
+                        --nvdApiKey ${NVD_API_KEY}
                         ''', odcInstallation: 'dp-check'
                     }
                 }
@@ -84,6 +84,24 @@ pipeline {
             }
         }
         
+        stage('SAST-Quality Check') {
+            when {
+                branch "feature-*"
+            }
+            steps {
+                timeout(time: 60, unit: 'SECONDS') {
+                    withSonarQubeEnv('sonar-server') {
+                        sh '''
+                            $SCANNER_HOME/bin/sonar-scanner \
+                              -Dsonar.projectKey=solar-system \
+                              -Dsonar.sources=app.js \
+                              -Dsonar.javascript.lcov.reportPaths=./coverage/lcov.info 
+                        '''
+                    }
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
         
         stage('Build the image') {
             when {
@@ -94,43 +112,43 @@ pipeline {
             }
         }
         
-        // stage('Scan the image') {
-        //     when {
-        //         branch "feature-*"
-        //     }
-        //     steps {
-        //         sh '''
-        //             trivy image vijesh89/solar-system:${BUILD_ID} \
-        //             --severity MEDIUM,LOW,UNKNOWN,HIGH \
-        //             --exit-code 0 \
-        //             --quiet \
-        //             --format json -o trivy-scan-LOW-MEDIUM-HIGH-report.json
+        stage('Scan the image') {
+            when {
+                branch "feature-*"
+            }
+            steps {
+                sh '''
+                    trivy image vijesh89/solar-system:${BUILD_ID} \
+                    --severity MEDIUM,LOW,UNKNOWN,HIGH \
+                    --exit-code 0 \
+                    --quiet \
+                    --format json -o trivy-scan-LOW-MEDIUM-HIGH-report.json
                     
-        //             trivy image vijesh89/solar-system:${BUILD_ID} \
-        //             --severity CRITICAL \
-        //             --exit-code 1 \
-        //             --quiet \
-        //             --format json -o trivy-scan-CRITICAL-report.json
-        //         '''
-        //     }
-        //     post {
-        //         always {
-        //             sh '''
-        //                 trivy convert --format template --template @/usr/local/share/trivy/templates/html.tpl \
-        //                 -o trivy-scan-LOW-MEDIUM-HIGH-report.html trivy-scan-LOW-MEDIUM-HIGH-report.json
+                    trivy image vijesh89/solar-system:${BUILD_ID} \
+                    --severity CRITICAL \
+                    --exit-code 1 \
+                    --quiet \
+                    --format json -o trivy-scan-CRITICAL-report.json
+                '''
+            }
+            post {
+                always {
+                    sh '''
+                        trivy convert --format template --template @/usr/local/share/trivy/templates/html.tpl \
+                        -o trivy-scan-LOW-MEDIUM-HIGH-report.html trivy-scan-LOW-MEDIUM-HIGH-report.json
                         
-        //                 trivy convert --format template --template @/usr/local/share/trivy/templates/junit.tpl \
-        //                 -o trivy-scan-LOW-MEDIUM-HIGH-report.xml trivy-scan-LOW-MEDIUM-HIGH-report.json
+                        trivy convert --format template --template @/usr/local/share/trivy/templates/junit.tpl \
+                        -o trivy-scan-LOW-MEDIUM-HIGH-report.xml trivy-scan-LOW-MEDIUM-HIGH-report.json
                         
-        //                 trivy convert --format template --template @/usr/local/share/trivy/templates/html.tpl \
-        //                 -o trivy-scan-CRITICAL-report.html trivy-scan-CRITICAL-report.json
+                        trivy convert --format template --template @/usr/local/share/trivy/templates/html.tpl \
+                        -o trivy-scan-CRITICAL-report.html trivy-scan-CRITICAL-report.json
                         
-        //                 trivy convert --format template --template @/usr/local/share/trivy/templates/junit.tpl \
-        //                 -o trivy-scan-CRITICAL-report.xml trivy-scan-CRITICAL-report.json
-        //             '''
-        //         }
-        //     }
-        // }
+                        trivy convert --format template --template @/usr/local/share/trivy/templates/junit.tpl \
+                        -o trivy-scan-CRITICAL-report.xml trivy-scan-CRITICAL-report.json
+                    '''
+                }
+            }
+        }
         
         stage('Push the Image') {
             when {
@@ -209,7 +227,7 @@ pipeline {
                        ls -lrt
                        mkdir reports-${BUILD_NUMBER}
                        cp -rf coverage/ reports-${BUILD_NUMBER}
-                       cp test-results.xml dependency*.*  reports-${BUILD_NUMBER}
+                       cp test-results.xml dependency*.* trivy*.* reports-${BUILD_NUMBER}
                        ls -ltr reports-${BUILD_NUMBER}
                     '''
                     s3Upload(
