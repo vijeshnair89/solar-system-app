@@ -10,7 +10,7 @@ pipeline {
         SCANNER_HOME   = tool 'sonar-scanner'
         MONGO_URI = credentials('mongo_url')
         MONGO_USERNAME  = credentials('mongo_user')
-        MONGO_PASSWORD   = credentials('mongo_pwd') 
+        MONGO_PASSWORD   = credentials('mongo_pwd')  
         GITHUB_TOKEN = credentials('github-token')
         APP_SERVER = credentials('server-ip')
         s3_bucket = credentials('s3-bucket')
