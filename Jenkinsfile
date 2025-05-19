@@ -4,7 +4,7 @@ pipeline {
     tools {  
         nodejs 'nodejs'
     }
-    
+     
     environment {
         NVD_API_KEY = credentials('nvd-api-key-id') 
         SCANNER_HOME   = tool 'sonar-scanner'
