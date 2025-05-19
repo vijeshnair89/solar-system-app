@@ -13,6 +13,7 @@ pipeline {
         MONGO_PASSWORD   = credentials('mongo_pwd') 
         GITHUB_TOKEN = credentials('github-token')
         APP_SERVER = credentials('server-ip')
+        s3-bucket = credentials('s3-bucket')
     }
 
     stages {
@@ -233,7 +234,7 @@ pipeline {
                     s3Upload(
                         file: "reports-${BUILD_NUMBER}",
                         path: "jenkins-${JOB_NAME}-build-${BUILD_NUMBER}",
-                        bucket: 'solar-system-123-jenkins-bucket'
+                        bucket: "${s3-bucket}"
                     )
                 }
             }
