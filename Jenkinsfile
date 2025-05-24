@@ -233,7 +233,7 @@ pipeline {
                     '''
                     s3Upload(
                         file: "reports-${BRANCH_NAME}-build-${BUILD_NUMBER}",
-                        path: "jenkins-${JOB_NAME}/${BRANCH_NAME}/build-${BUILD_NUMBER}",
+                        path: "jenkins-${JOB_NAME}/${BRANCH_NAME}-build-${BUILD_NUMBER}",
                         bucket: "${s3_bucket}"
                     )
                 }
