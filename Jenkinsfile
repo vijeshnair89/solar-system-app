@@ -226,14 +226,14 @@ pipeline {
                 withAWS(credentials: 'aws-ec2-access-creds', region: 'us-east-1') {
                     sh '''
                        ls -lrt
-                       mkdir reports-${BRANCH_NAME}-${BUILD_NUMBER}
-                       cp -rf coverage/ reports-${BRANCH_NAME}-${BUILD_NUMBER}
-                       cp test-results.xml dependency*.* trivy*.* reports-${BRANCH_NAME}-${BUILD_NUMBER}
-                       ls -ltr reports-${BRANCH_NAME}-${BUILD_NUMBER}
+                       mkdir reports-${BRANCH_NAME}-build-${BUILD_NUMBER}
+                       cp -rf coverage/ reports-${BRANCH_NAME}-build-${BUILD_NUMBER}
+                       cp test-results.xml dependency*.* trivy*.* reports-${BRANCH_NAME}-build-${BUILD_NUMBER}
+                       ls -ltr reports-${BRANCH_NAME}-build-${BUILD_NUMBER}
                     '''
                     s3Upload(
-                        file: "reports-${BRANCH_NAME}-${BUILD_NUMBER}",
-                        path: "jenkins-${JOB_NAME}-${BRANCH_NAME}-build-${BUILD_NUMBER}",
+                        file: "reports-${BRANCH_NAME}-build-${BUILD_NUMBER}",
+                        path: "jenkins-${JOB_NAME}/${BRANCH_NAME}/build-${BUILD_NUMBER}",
                         bucket: "${s3_bucket}"
                     )
                 }
