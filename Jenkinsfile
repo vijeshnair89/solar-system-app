@@ -68,9 +68,6 @@ pipeline {
         }
                 
         stage('unit test') {
-            when {
-                branch "feature-*"
-            }
             steps {
                 sh 'npm test'
             }
