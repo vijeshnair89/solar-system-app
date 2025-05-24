@@ -109,7 +109,7 @@ pipeline {
                 branch "feature-*"
             }
             steps {
-                sh "docker build -t vijesh89/solar-system-${BRANCH_NAME}:${BUILD_ID} ."
+                sh "docker build -t vijesh89/solar-system:${BRANCH_NAME}-v.${BUILD_ID} ."
             }
         }
         
@@ -119,13 +119,13 @@ pipeline {
             }
             steps {
                 sh '''
-                    trivy image vijesh89/solar-system-${BRANCH_NAME}:${BUILD_ID} \
+                    trivy image vijesh89/solar-system:${BRANCH_NAME}-v.${BUILD_ID} \
                     --severity MEDIUM,LOW,UNKNOWN,HIGH \
                     --exit-code 0 \
                     --quiet \
                     --format json -o trivy-scan-LOW-MEDIUM-HIGH-report.json
                     
-                    trivy image vijesh89/solar-system-${BRANCH_NAME}:${BUILD_ID} \
+                    trivy image vijesh89/solar-system:${BRANCH_NAME}-v.${BUILD_ID} \
                     --severity CRITICAL \
                     --exit-code 1 \
                     --quiet \
@@ -157,7 +157,7 @@ pipeline {
             }
             steps {
                 withDockerRegistry(credentialsId: 'docker-creds', url: 'https://index.docker.io/v1/') {
-                    sh 'docker push vijesh89/solar-system-${BRANCH_NAME}:${BUILD_ID}'   
+                    sh 'docker push vijesh89/solar-system:${BRANCH_NAME}-v.${BUILD_ID}'   
                 }
             }
         }
@@ -182,7 +182,7 @@ pipeline {
                                     -e MONGO_URI=${MONGO_URI} \
                                     -e MONGO_USERNAME=${MONGO_USERNAME} \
                                     -e MONGO_PASSWORD=${MONGO_PASSWORD} \
-                                    -p 3000:3000 vijesh89/solar-system-${BRANCH_NAME}:${BUILD_ID}
+                                    -p 3000:3000 vijesh89/solar-system:${BRANCH_NAME}-v.${BUILD_ID}
                             "
                         """
                     }
@@ -268,7 +268,7 @@ pipeline {
                         // Update image tag and push
                         dir("${repoDir}/${subDir}") {
                             sh """
-                                sed -i 's@vijesh89.*@vijesh89/solar-system:${BUILD_ID}@g' deployment.yml
+                                sed -i 's@vijesh89.*@vijesh89/solar-system:${BRANCH_NAME}:${BUILD_ID}@g' deployment.yml
                                 echo "Updated deployment.yml:"
                                 cat deployment.yml
         
